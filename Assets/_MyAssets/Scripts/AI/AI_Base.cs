@@ -1,8 +1,9 @@
+using Fusion;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AI_Base : MonoBehaviour
+public class AI_Base : NetworkBehaviour
 {
     [SerializeField] Vector2 moveCheckCDMinMax = new Vector2(2.5f, 7.5f);
     [SerializeField] float standardMoveSpeed = 1;
@@ -13,11 +14,28 @@ public class AI_Base : MonoBehaviour
     [SerializeField] Transform myVisualsTransform;
     [SerializeField] SpriteRenderer myVisualsRend;
     [SerializeField] Rigidbody2D myBody;
+    [SerializeField] Collider2D myCollider;
 
     float currentMoveAmount = 0;
     bool spinAround = false;
 
-    IEnumerator Start()
+    public void Catch()
+    {
+        myBody.isKinematic = true;
+        myBody.velocity = Vector2.zero;
+        myCollider.enabled = false;
+    }
+
+    public override void Spawned()
+    {
+        base.Spawned();
+        if (Runner.IsServer)
+        {
+            StartCoroutine(MoveRoutine());
+        }
+    }
+
+    IEnumerator MoveRoutine()
     {
         yield return new WaitForSeconds(Random.Range(0, moveCheckCDMinMax.x));
         Move();
@@ -32,13 +50,16 @@ public class AI_Base : MonoBehaviour
     void Move()
     {
         Vector2 moveAngle = GetMoveAngle();
-        if(moveAngle == Vector2.one)
-        {
-            return;
-        }
+        myBody.AddForce(moveAngle * currentMoveAmount * standardMoveSpeed);
+        if(moveAngle != Vector2.one)
+            RPC_Move(moveAngle, currentMoveAmount);
+    }
 
+    [Rpc(sources: RpcSources.All, targets: RpcTargets.All)]
+    void RPC_Move(Vector2 moveAngle, float moveAmount)
+    {
         myAnim.SetBool("Swim", true);
-        if(moveAngle.x < 0)
+        if (moveAngle.x < 0)
         {
             spinAround = true;
         }
@@ -47,15 +68,13 @@ public class AI_Base : MonoBehaviour
             spinAround = false;
         }
         myVisualsRend.flipX = spinAround;
-        //myVisualsTransform.forward = moveAngle;
-        myBody.AddForce(moveAngle * currentMoveAmount * standardMoveSpeed);
 
-        StartCoroutine(SwimRoutine());
+        StartCoroutine(SwimRoutine(moveAmount));
     }
 
-    IEnumerator SwimRoutine()
+    IEnumerator SwimRoutine(float moveAmount)
     {
-        yield return new WaitForSeconds(Mathf.Lerp(swimTimeMinMax.x, swimTimeMinMax.y, currentMoveAmount / moveMinMax.y));
+        yield return new WaitForSeconds(Mathf.Lerp(swimTimeMinMax.x, swimTimeMinMax.y, moveAmount / moveMinMax.y));
         myAnim.speed = .15f;
         yield return new WaitForSeconds(.25f);
 

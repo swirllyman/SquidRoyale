@@ -44,9 +44,11 @@ GameObject:
   - component: {fileID: 7268990360496567148}
   - component: {fileID: 5249814963759638969}
   - component: {fileID: 5497487063453847368}
+  - component: {fileID: 101469112010046620}
+  - component: {fileID: 2665255344003063919}
   m_Layer: 6
   m_Name: NPC_Base
-  m_TagString: Untagged
+  m_TagString: Fish
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -79,6 +81,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87a6318ccd987d4418b24040c27e8ac5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _interpolationDataSource: 0
   moveCheckCDMinMax: {x: 2.5, y: 8}
   standardMoveSpeed: 125
   moveMinMax: {x: 1, y: 3}
@@ -90,6 +93,7 @@ MonoBehaviour:
   myVisualsTransform: {fileID: 4094274114593945499}
   myVisualsRend: {fileID: 2124592251432428562}
   myBody: {fileID: 5249814963759638969}
+  myCollider: {fileID: 5497487063453847368}
 --- !u!50 &5249814963759638969
 Rigidbody2D:
   serializedVersion: 4
@@ -127,6 +131,57 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.29
+--- !u!114 &101469112010046620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8426818828777604204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1779252708, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _interpolationDataSource: 0
+  InterpolationSpace: 0
+  InterpolationTarget: {fileID: 1008395317106443850}
+  InterpolateErrorCorrection: 1
+  InterpolatedErrorCorrectionSettings:
+    MinRate: 3.3
+    MaxRate: 10
+    PosBlendStart: 0.25
+    PosBlendEnd: 1
+    PosMinCorrection: 0.025
+    PosTeleportDistance: 2
+    RotBlendStart: 0.1
+    RotBlendEnd: 0.5
+    RotTeleportRadians: 1.5
+--- !u!114 &2665255344003063919
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8426818828777604204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ObjectInterest: 1
+  DefaultInterestGroups: []
+  DestroyWhenStateAuthorityLeaves: 0
+  AllowStateAuthorityOverride: 1
+  AoiPositionSource: {fileID: 0}
+  Flags: 2305
+  NetworkGuid:
+    RawGuidValue: 32230eec41c250648aea979f863cb325
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 7268990360496567148}
+  - {fileID: 101469112010046620}
+  SimulationBehaviours: []
 --- !u!1 &9192124793666106757
 GameObject:
   m_ObjectHideFlags: 0

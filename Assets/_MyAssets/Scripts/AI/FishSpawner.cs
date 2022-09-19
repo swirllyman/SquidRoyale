@@ -1,60 +1,50 @@
+using Fusion;
+using Fusion.Sockets;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class FishSpawner : MonoBehaviour
+public class FishSpawner : NetworkBehaviour
 {
     [Header("Bounds")]
     [SerializeField] Vector2 bounds;
     [SerializeField] Vector2 spawnRateMinMax = new Vector2(.25f, 5.0f);
     [SerializeField] LayerMask hitMask;
-    [SerializeField] GameObject[] npc_Prefabs;
+    [SerializeField] NetworkPrefabRef[] npc_Prefabs;
     [SerializeField] bool autoSpawn = false;
-    [SerializeField] int populationCount = 50;
     [SerializeField] int maxPopulation = 100;
 
-    int currentPopulationCount = 0;
+    internal int currentPopulationCount = 0;
 
-
-    // Start is called before the first frame update
-    void Start()
+    public override void Spawned()
     {
-        if (autoSpawn)
+        base.Spawned();
+
+        if (Runner.IsServer)
         {
-            int[] fishTypes = new int[maxPopulation];
-            for (int i = 0; i < maxPopulation; i++)
-                fishTypes[i] = Random.Range(0, npc_Prefabs.Length);
-            StartCoroutine(SpawnRoutine(fishTypes));
+            if (autoSpawn)
+            {
+                //print("Auto Spawning");
+                StartCoroutine(SpawnRoutine());
+            }
         }
     }
 
-    // Update is called once per frame
-    void Update()
+    IEnumerator SpawnRoutine()
     {
-        
-    }
-
-    [ContextMenu("Spawn Fish")]
-    void SpawnFish()
-    {
-        int[] fishTypes = new int[populationCount];
-        for (int i = 0; i < populationCount; i++)
-            fishTypes[i] = Random.Range(0, npc_Prefabs.Length);
-
-        StartCoroutine(SpawnRoutine(fishTypes));
-    }
-
-    IEnumerator SpawnRoutine(int[] fishTypes)
-    {
-        for (int i = 0; i < fishTypes.Length; i++)
+        while (true)
         {
-            currentPopulationCount++;
-            if (currentPopulationCount >= maxPopulation)
-                yield break;
-
-            Transform t = Instantiate(npc_Prefabs[fishTypes[i]], transform).transform;
-            t.position = GetPositionInBounds();
-            yield return new WaitForSeconds(Random.Range(spawnRateMinMax.x, spawnRateMinMax.y));
+            if(currentPopulationCount < maxPopulation)
+            {
+                currentPopulationCount++;
+                NetworkObject networkFish = Runner.Spawn(npc_Prefabs[Random.Range(0, npc_Prefabs.Length)], GetPositionInBounds(), Quaternion.identity);
+                networkFish.transform.parent = transform;
+                yield return new WaitForSeconds(Random.Range(spawnRateMinMax.x, spawnRateMinMax.y));
+            }
+            else
+            {
+                yield return new WaitForSeconds(5.0f);
+            }
         }
     }
 
@@ -75,7 +65,7 @@ public class FishSpawner : MonoBehaviour
             }
         }
 
-        print("Unable to find an open position");
+        //print("Unable to find an open position");
         return returnPosition;
     }
 
