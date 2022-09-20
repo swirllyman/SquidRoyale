@@ -39,17 +39,18 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
     {
         var data = new NetworkInputData();
 
-        if (Input.GetKey(KeyCode.W))
-            data.direction += Vector3.up;
+        data.direction = new Vector3(Input.GetAxisRaw("Horizontal"), Input.GetAxis("Vertical"), 0);
+        //if (Input.GetKey(KeyCode.W))
+        //    data.direction += Vector3.up;
 
-        if (Input.GetKey(KeyCode.S))
-            data.direction += Vector3.down;
+        //if (Input.GetKey(KeyCode.S))
+        //    data.direction += Vector3.down;
 
-        if (Input.GetKey(KeyCode.A))
-            data.direction += Vector3.left;
+        //if (Input.GetKey(KeyCode.A))
+        //    data.direction += Vector3.left;
 
-        if (Input.GetKey(KeyCode.D))
-            data.direction += Vector3.right;
+        //if (Input.GetKey(KeyCode.D))
+        //    data.direction += Vector3.right;
 
         if (_mouseButton0)
             data.buttons |= NetworkInputData.MOUSEBUTTON1;
@@ -59,20 +60,13 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
             data.buttons |= NetworkInputData.MOUSEBUTTON1_UP;
         _mouseButton0_Release = false;
 
-
-        //Vector3 mousePos = Input.mousePosition;
-        //Vector3 worldPositionInWorld = Camera.main.ScreenToWorldPoint(mousePos);
-        //worldPositionInWorld.z = 0;
         if (PlayerController.localPlayer != null)
         {
-            data.currentAim = PlayerController.localPlayer.GetCurrentAim();
-            data.shotPower = PlayerController.localPlayer.GetShotPower();
-            //data.aimDirection = PlayerController.singleton.GetCurrentLookDirection();
+            data.currentAim = PlayerController.localPlayer.shooter.GetCurrentAim();
+            data.shotPower = PlayerController.localPlayer.shooter.GetShotPower();
         }
 
-
-
-            input.Set(data);
+        input.Set(data);
     }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) { }

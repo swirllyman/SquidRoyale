@@ -24,6 +24,7 @@ public class AI_Base : NetworkBehaviour
         myBody.isKinematic = true;
         myBody.velocity = Vector2.zero;
         myCollider.enabled = false;
+        GetComponent<NetworkRigidbody2D>().enabled = false;
     }
 
     public override void Spawned()
