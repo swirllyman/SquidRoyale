@@ -16,6 +16,7 @@ public class TentacleShooter : NetworkBehaviour
     public Transform aimPositionTransform;
     public float shootDistance = 7.5f;
     [SerializeField] LayerMask hitMask;
+    [SerializeField] Color startColor;
     [SerializeField] Transform targetArrowTransform;
     [SerializeField] SpriteRenderer targettingArrowRend;
     [SerializeField] SpriteRenderer targettingArrowRendBG;
@@ -24,9 +25,18 @@ public class TentacleShooter : NetworkBehaviour
     Collider2D currentHitCollider;
     float shotPercInternal;
     float currentShotCD = 0.0f;
-    bool showingArrow = true;
     bool shooting = false;
     bool onCD = false;
+
+    [Networked]
+    bool hooked { get; set; }
+
+
+    [Networked]
+    bool showingArrow { get; set; }
+
+    [Networked]
+    private bool cancelled { get; set; }
 
     [Networked]
     private float currentShotPerc { get; set; }
@@ -42,7 +52,7 @@ public class TentacleShooter : NetworkBehaviour
 
     public static void ChargeClick(Changed<TentacleShooter> changed)
     {
-        if (!changed.Behaviour.chargeClick && changed.Behaviour.currentShotCD <= 0.0f)
+        if (!changed.Behaviour.chargeClick && changed.Behaviour.currentShotCD <= 0.0f &! changed.Behaviour.cancelled)
         {
             changed.Behaviour.ShootTentacles();
         }
@@ -50,12 +60,15 @@ public class TentacleShooter : NetworkBehaviour
 
     private void Awake()
     {
-        HideTargetArrow();
+        targettingArrowRend.enabled = false;
+        targettingArrowRendBG.enabled = false;
     }
 
     public override void Spawned()
     {
         base.Spawned();
+        showingArrow = false;
+        hooked = false;
         if (HasInputAuthority)
         {
             localPlayer = this;
@@ -75,10 +88,9 @@ public class TentacleShooter : NetworkBehaviour
             if (onCD)
             {
                 onCD = false;
-                if (showingArrow)
+                if (showingArrow &!targettingArrowRend.enabled && HasInputAuthority)
                 {
-                    targettingArrowRend.enabled = true;
-                    LeanTween.value(gameObject, UpdateArrow, 0.0f, targettingArrowRendBG.size.x, .5f);
+                    ShowTargettingArrow();
                 }
             }
         }
@@ -95,17 +107,32 @@ public class TentacleShooter : NetworkBehaviour
         {
             currentAim = data.currentAim;
             currentShotPerc = data.shotPower;
+
+            if(!hooked)
+                currentHitPoint = currentAim;
         }
 
-        if ((data.buttons & NetworkInputData.MOUSEBUTTON1) != 0)
+        if ((data.buttons & NetworkInputData.MOUSEBUTTON0_DOWN) != 0)
         {
             chargeClick = true;
         }
 
-        if ((data.buttons & NetworkInputData.MOUSEBUTTON1_UP) != 0)
+        if ((data.buttons & NetworkInputData.MOUSEBUTTON0_UP) != 0)
         {
             chargeClick = false;
         }
+
+        //if ((data.buttons & NetworkInputData.MOUSEBUTTON1_DOWN) != 0 &! cancelled)
+        //{
+        //    //print("MB1");
+        //    cancelled = true;
+        //    HideTargetArrow();
+        //}
+
+        //if ((data.buttons & NetworkInputData.MOUSEBUTTON0_UP) != 0)
+        //{
+        //    chargeClick = false;
+        //}
     }
 
     void CheckInput()
@@ -123,10 +150,17 @@ public class TentacleShooter : NetworkBehaviour
         {
             HideTargetArrow();
         }
+
+        if (Input.GetMouseButtonDown(1) && showingArrow)
+        {
+            CancelAim();
+            HideTargetArrow();
+        }
     }
 
     void ShootTentacles()
     {
+        GameManager.singleton.abilityButtons[0].PlayEffect_Use(shotCD);
         currentShotCD = shotCD;
         onCD = true;
         shooting = true;
@@ -170,12 +204,13 @@ public class TentacleShooter : NetworkBehaviour
                     currentHitCollider.GetComponent<AI_Base>().Catch();
                     currentHitCollider.transform.parent = tentacles.tentacleTips[0];
                 }
+                hooked = true;
                 return true;
             }
         }
 
         currentHitCollider = null;
-
+        hooked = false;
         return false;
     }
 
@@ -193,6 +228,7 @@ public class TentacleShooter : NetworkBehaviour
         }
 
         shooting = false;
+        hooked = false;
     }
 
     internal float GetShotPower()
@@ -211,7 +247,7 @@ public class TentacleShooter : NetworkBehaviour
 
     internal bool Aiming()
     {
-        return chargeClick & !onCD;
+        return chargeClick & !onCD &! cancelled;
     }
 
     internal bool Shooting()
@@ -236,6 +272,7 @@ public class TentacleShooter : NetworkBehaviour
     [ContextMenu("Show Arrow")]
     void ShowTargetArrow()
     {
+        cancelled = false;
         showingArrow = true;
 
         targettingArrowRend.size = new Vector2(0, 1);
@@ -244,9 +281,20 @@ public class TentacleShooter : NetworkBehaviour
 
         if (currentShotCD <= 0.0f)
         {
-            targettingArrowRend.enabled = true;
-            LeanTween.value(gameObject, UpdateArrow, 0.0f, targettingArrowRendBG.size.x, .5f);
+            ShowTargettingArrow();
         }
+        else
+        {
+            GameManager.singleton.abilityButtons[0].PlayEffect_CD();
+        }
+    }
+
+    void ShowTargettingArrow()
+    {
+        GameManager.singleton.abilityButtons[0].PlayEffect_Press();
+        targettingArrowRend.enabled = true;
+        LeanTween.value(gameObject, UpdateArrow, 0.0f, targettingArrowRendBG.size.x, .5f);
+        LeanTween.color(controller.visualsRend.gameObject, Color.red, .25f).setLoopPingPong();
     }
 
     void UpdateArrow(float f)
@@ -263,11 +311,19 @@ public class TentacleShooter : NetworkBehaviour
         showingArrow = false;
         targettingArrowRend.enabled = false;
         targettingArrowRendBG.enabled = false;
+        LeanTween.cancel(controller.visualsRend.gameObject);
+        LeanTween.color(controller.visualsRend.gameObject, startColor, .25f);
+    }
+
+    void CancelAim()
+    {
+        cancelled = true;
+        HideTargetArrow();
     }
 
     void CheckTargettingArrow()
     {
-        if (chargeClick)
+        if (showingArrow)
         {
             Vector3 mousePos = Input.mousePosition;
             Vector3 worldPosition = Camera.main.ScreenToWorldPoint(mousePos);
@@ -278,11 +334,11 @@ public class TentacleShooter : NetworkBehaviour
             if(!onCD)
                 playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, /*-targetArrowTransform.transform.right*/(Vector2)playerVisuals.transform.position - currentHitPoint, Time.deltaTime * 5);
             else
-                playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, Vector2.up, Time.deltaTime * 5);
+                playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, controller.moveDirection == Vector2.zero ? Vector2.up : controller.moveDirection, Time.deltaTime * 5);
         }
         else if (shooting)
         {
-            playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, /*-targetArrowTransform.transform.right*/ (Vector2)playerVisuals.transform.position - currentHitPoint, Time.deltaTime * 5);
+            playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, (Vector2)playerVisuals.transform.position - currentHitPoint, Time.deltaTime * 5);
         }
         else
         {

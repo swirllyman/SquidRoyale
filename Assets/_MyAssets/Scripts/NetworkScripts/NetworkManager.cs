@@ -6,11 +6,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
+public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 {
     [SerializeField] FishSpawner spawner;
 
     [SerializeField] private NetworkPrefabRef _playerPrefab;
+    [SerializeField] private GameObject mainMenuUI;
+
     private Dictionary<PlayerRef, NetworkObject> _spawnedCharacters = new Dictionary<PlayerRef, NetworkObject>();
 
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
@@ -40,25 +42,23 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
         var data = new NetworkInputData();
 
         data.direction = new Vector3(Input.GetAxisRaw("Horizontal"), Input.GetAxis("Vertical"), 0);
-        //if (Input.GetKey(KeyCode.W))
-        //    data.direction += Vector3.up;
-
-        //if (Input.GetKey(KeyCode.S))
-        //    data.direction += Vector3.down;
-
-        //if (Input.GetKey(KeyCode.A))
-        //    data.direction += Vector3.left;
-
-        //if (Input.GetKey(KeyCode.D))
-        //    data.direction += Vector3.right;
 
         if (_mouseButton0)
-            data.buttons |= NetworkInputData.MOUSEBUTTON1;
+            data.buttons |= NetworkInputData.MOUSEBUTTON0_DOWN;
         _mouseButton0 = false;
 
         if (_mouseButton0_Release)
-            data.buttons |= NetworkInputData.MOUSEBUTTON1_UP;
+            data.buttons |= NetworkInputData.MOUSEBUTTON0_UP;
         _mouseButton0_Release = false;
+
+        if (_mouseButton1)
+            data.buttons |= NetworkInputData.MOUSEBUTTON1_DOWN;
+        _mouseButton1 = false;
+
+        if (_mouseButton1_Release)
+            data.buttons |= NetworkInputData.MOUSEBUTTON1_UP;
+        _mouseButton1_Release = false;
+
 
         if (PlayerController.localPlayer != null)
         {
@@ -70,7 +70,11 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
     }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
     public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) { }
-    public void OnConnectedToServer(NetworkRunner runner) { }
+    public void OnConnectedToServer(NetworkRunner runner) 
+    {
+        Debug.Log("Connected To Server");
+       
+    }
     public void OnDisconnectedFromServer(NetworkRunner runner) { }
     public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
     public void OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason) { }
@@ -79,17 +83,33 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
     public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ArraySegment<byte> data) { }
-    public void OnSceneLoadDone(NetworkRunner runner) { }
+    public void OnSceneLoadDone(NetworkRunner runner) 
+    {
+        Debug.Log("Scene Loaded");
+        GameManager.singleton.screenSaver.HideLoadScreen();
+        mainMenuUI.SetActive(true);
+    }
     public void OnSceneLoadStart(NetworkRunner runner) { }
 
 
     private NetworkRunner _runner;
     private bool _mouseButton0;
     private bool _mouseButton0_Release;
+    private bool _mouseButton1;
+    private bool _mouseButton1_Release;
+
+    void Awake()
+    {
+        mainMenuUI.SetActive(false);
+    }
+
     private void Update()
     {
         _mouseButton0 = _mouseButton0 | Input.GetMouseButton(0);
         _mouseButton0_Release = _mouseButton0_Release | Input.GetMouseButtonUp(0);
+
+        _mouseButton1 = _mouseButton1 | Input.GetMouseButton(1);
+        _mouseButton1_Release = _mouseButton1_Release | Input.GetMouseButtonUp(1);
     }
 
     private void OnGUI()
@@ -112,6 +132,8 @@ public class BasicSpawner : MonoBehaviour, INetworkRunnerCallbacks
         // Create the Fusion runner and let it know that we will be providing user input
         _runner = gameObject.AddComponent<NetworkRunner>();
         _runner.ProvideInput = true;
+
+        GameManager.singleton.screenSaver.PlayLoadScreen();
 
         // Start or join (depends on gamemode) a session with a specific name
         await _runner.StartGame(new StartGameArgs()

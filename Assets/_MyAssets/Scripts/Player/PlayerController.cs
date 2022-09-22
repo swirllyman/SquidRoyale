@@ -11,10 +11,10 @@ public class PlayerController : NetworkBehaviour
     public TentacleShooter shooter;
     public CircleCollider2D myCollider;
     public Rigidbody2D myBody;
+    public SpriteRenderer visualsRend;
 
     [SerializeField] float moveCD = .5f;
     [SerializeField] float moveSpeedBase = 100.0f;
-    [SerializeField] SpriteRenderer visualsRend;
 
     [Networked]
     public Vector2 moveDirection { get; set; }
