@@ -8,10 +8,13 @@ public class PlayerController : NetworkBehaviour
 {
     public static PlayerController localPlayer;
 
+    public TargettingSystem targettingSystem;
     public TentacleShooter shooter;
-    public CircleCollider2D myCollider;
+    public Collider2D myCollider;
     public Rigidbody2D myBody;
     public SpriteRenderer visualsRend;
+    public Transform playerVisualsTransform;
+    public bool overrideRotation = false;
 
     [SerializeField] float moveCD = .5f;
     [SerializeField] float moveSpeedBase = 100.0f;
@@ -39,16 +42,22 @@ public class PlayerController : NetworkBehaviour
     void Update()
     {
         CheckMoveTimer();
+    }
 
-        //if(HasInputAuthority)
-        //    moveDirection = new Vector3(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"), 0);
-;    }
+    private void LateUpdate()
+    {
+        if (!overrideRotation)
+        {
+            playerVisualsTransform.transform.up = Vector3.Lerp(playerVisualsTransform.transform.up, moveDirection == Vector2.zero ? Vector2.up : moveDirection, Time.deltaTime * 5);
+        }
+    }
 
     public override void FixedUpdateNetwork()
     {
         if (GetInput(out NetworkInputData data))
         {
             moveDirection = data.direction;
+            //NetworkCharacterControllerPrototype
         }
     }
 

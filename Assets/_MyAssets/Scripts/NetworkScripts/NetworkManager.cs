@@ -43,27 +43,31 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
         data.direction = new Vector3(Input.GetAxisRaw("Horizontal"), Input.GetAxis("Vertical"), 0);
 
-        if (_mouseButton0)
-            data.buttons |= NetworkInputData.MOUSEBUTTON0_DOWN;
-        _mouseButton0 = false;
+        data.mb1_Down = Input.GetMouseButton(0);
+        data.mb1_Up = !Input.GetMouseButton(0);
+        data.mb2_Down = Input.GetMouseButton(1);
 
-        if (_mouseButton0_Release)
-            data.buttons |= NetworkInputData.MOUSEBUTTON0_UP;
-        _mouseButton0_Release = false;
+        //if (_mouseButton0)
+        //    data.buttons |= NetworkInputData.MOUSEBUTTON0_DOWN;
+        //_mouseButton0 = false;
 
-        if (_mouseButton1)
-            data.buttons |= NetworkInputData.MOUSEBUTTON1_DOWN;
-        _mouseButton1 = false;
+        //if (_mouseButton0_Release)
+        //    data.buttons |= NetworkInputData.MOUSEBUTTON0_UP;
+        //_mouseButton0_Release = false;
 
-        if (_mouseButton1_Release)
-            data.buttons |= NetworkInputData.MOUSEBUTTON1_UP;
-        _mouseButton1_Release = false;
+        //if (_mouseButton1)
+        //    data.buttons |= NetworkInputData.MOUSEBUTTON1_DOWN;
+        //_mouseButton1 = false;
+
+        //if (_mouseButton1_Release)
+        //    data.buttons |= NetworkInputData.MOUSEBUTTON1_UP;
+        //_mouseButton1_Release = false;
 
 
         if (PlayerController.localPlayer != null)
         {
-            data.currentAim = PlayerController.localPlayer.shooter.GetCurrentAim();
-            data.shotPower = PlayerController.localPlayer.shooter.GetShotPower();
+            data.currentAim = PlayerController.localPlayer.targettingSystem.LocalPlayer_CurrentAimWorldCoords();
+            data.shotPower = PlayerController.localPlayer.targettingSystem.GetShotPower();
         }
 
         input.Set(data);

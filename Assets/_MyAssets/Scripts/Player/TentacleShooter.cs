@@ -6,174 +6,121 @@ using Cinemachine;
 
 public class TentacleShooter : NetworkBehaviour
 {
-    public static TentacleShooter localPlayer;
     [SerializeField] PlayerController controller;
-    [SerializeField] Transform playerVisuals;
 
-    [SerializeField] float shotCD = 2.0f;
+    [SerializeField] float abilityCD = 2.0f;
 
     [Header("Targetting System")]
-    public Transform aimPositionTransform;
     public float shootDistance = 7.5f;
     [SerializeField] LayerMask hitMask;
-    [SerializeField] Color startColor;
-    [SerializeField] Transform targetArrowTransform;
-    [SerializeField] SpriteRenderer targettingArrowRend;
-    [SerializeField] SpriteRenderer targettingArrowRendBG;
     [SerializeField] Tentacles tentacles;
 
     Collider2D currentHitCollider;
-    float shotPercInternal;
-    float currentShotCD = 0.0f;
+    float currentAbilityCD = 0.0f;
     bool shooting = false;
     bool onCD = false;
+    bool chargingShot = false;
 
     [Networked]
     bool hooked { get; set; }
 
-
-    [Networked]
-    bool showingArrow { get; set; }
-
-    [Networked]
-    private bool cancelled { get; set; }
-
     [Networked]
     private float currentShotPerc { get; set; }
-
-    [Networked]
-    public Vector2 currentAim { get; set; }
-
-    [Networked]
-    public Vector2 currentHitPoint { get; set; }
 
     [Networked(OnChanged = nameof(ChargeClick))]
     public NetworkBool chargeClick { get; set; }
 
     public static void ChargeClick(Changed<TentacleShooter> changed)
     {
-        if (!changed.Behaviour.chargeClick && changed.Behaviour.currentShotCD <= 0.0f &! changed.Behaviour.cancelled)
+        if (changed.Behaviour.chargeClick)
         {
-            changed.Behaviour.ShootTentacles();
+            changed.Behaviour.controller.targettingSystem.aiming = true;
+            if(changed.Behaviour.HasInputAuthority)
+                changed.Behaviour.TryToStartShot();
         }
-    }
-
-    private void Awake()
-    {
-        targettingArrowRend.enabled = false;
-        targettingArrowRendBG.enabled = false;
+        else
+        {
+            if (!changed.Behaviour.onCD && changed.Behaviour.chargingShot)
+            {
+                changed.Behaviour.ShootTentacles();
+            }
+            changed.Behaviour.controller.targettingSystem.aiming = false;
+        }
     }
 
     public override void Spawned()
     {
         base.Spawned();
-        showingArrow = false;
         hooked = false;
-        if (HasInputAuthority)
-        {
-            localPlayer = this;
-        }
+    }
+    private void Start()
+    {
+        controller.targettingSystem.onTargetCancel += TargettingSystem_onTargetCancel;
+    }
+
+    private void TargettingSystem_onTargetCancel()
+    {
+        RPC_StopShotStart();
     }
 
     // Update is called once per frame
     void Update()
     {
-        CheckInput();
-        if (currentShotCD > 0.0f)
+        if (currentAbilityCD > 0.0f)
         {
-            currentShotCD -= Time.deltaTime;
+            currentAbilityCD -= Time.deltaTime;
         }
         else
         {
             if (onCD)
             {
                 onCD = false;
-                if (showingArrow &!targettingArrowRend.enabled && HasInputAuthority)
+                if (HasInputAuthority && chargeClick)
                 {
-                    ShowTargettingArrow();
+                    //ShowTargettingArrow();
+                    TryToStartShot();
                 }
             }
         }
-    }
-
-    private void LateUpdate()
-    {
-        CheckTargettingArrow();
     }
 
     public override void FixedUpdateNetwork()
     {
         if (GetInput(out NetworkInputData data))
         {
-            currentAim = data.currentAim;
             currentShotPerc = data.shotPower;
-
-            if(!hooked)
-                currentHitPoint = currentAim;
+            chargeClick = data.mb1_Down;
         }
-
-        if ((data.buttons & NetworkInputData.MOUSEBUTTON0_DOWN) != 0)
-        {
-            chargeClick = true;
-        }
-
-        if ((data.buttons & NetworkInputData.MOUSEBUTTON0_UP) != 0)
-        {
-            chargeClick = false;
-        }
-
-        //if ((data.buttons & NetworkInputData.MOUSEBUTTON1_DOWN) != 0 &! cancelled)
-        //{
-        //    //print("MB1");
-        //    cancelled = true;
-        //    HideTargetArrow();
-        //}
-
-        //if ((data.buttons & NetworkInputData.MOUSEBUTTON0_UP) != 0)
-        //{
-        //    chargeClick = false;
-        //}
     }
 
-    void CheckInput()
+    void TryToStartShot()
     {
-        //moveDirection = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-
-        if (!HasInputAuthority) return;
-
-        if (Input.GetMouseButtonDown(0))
+        if (!onCD)
         {
-            ShowTargetArrow();
+            controller.targettingSystem.ExpandTargetArrow();
+            RPC_ShowShotStart();
         }
-
-        if (Input.GetMouseButtonUp(0) && showingArrow)
+        else
         {
-            HideTargetArrow();
-        }
-
-        if (Input.GetMouseButtonDown(1) && showingArrow)
-        {
-            CancelAim();
-            HideTargetArrow();
+            GameManager.singleton.abilityButtons[0].PlayEffect_CD();
         }
     }
 
     void ShootTentacles()
     {
-        GameManager.singleton.abilityButtons[0].PlayEffect_Use(shotCD);
-        currentShotCD = shotCD;
+        GameManager.singleton.abilityButtons[0].PlayEffect_Use(abilityCD);
+        currentAbilityCD = abilityCD;
         onCD = true;
         shooting = true;
-        Vector2 direction = (currentAim - (Vector2)transform.position).normalized;
-        float dist = currentShotPerc * 4;
+        Vector2 direction = (controller.targettingSystem.currentAim - (Vector2)transform.position).normalized;
+        float dist = currentShotPerc * 3.85f;
 
         Debug.DrawRay(transform.position, direction * dist, Color.red, 1.5f);
 
-
         RaycastHit2D[] hits = Physics2D.CircleCastAll(transform.position, .35f, direction, dist, hitMask);
-        currentHitPoint = currentAim;
         currentHitCollider = null;
 
+        Vector2 currentHitPoint = (Vector2)transform.position + direction * dist;
         for (int i = hits.Length - 1; i >= 0; i--)
         {
             foreach (RaycastHit2D hit in hits)
@@ -187,8 +134,12 @@ public class TentacleShooter : NetworkBehaviour
             }
         }
 
-        aimPositionTransform.position = currentHitPoint;
         tentacles.ShootToPoint(currentHitPoint);
+
+        if (HasInputAuthority)
+        {
+            RPC_StopShotStart();
+        }
     }
 
 
@@ -231,23 +182,9 @@ public class TentacleShooter : NetworkBehaviour
         hooked = false;
     }
 
-    internal float GetShotPower()
-    {
-        return shotPercInternal;
-    }
-    internal Vector2 GetCurrentAim()
-    {
-        return aimPositionTransform.position;
-    }
-
-    internal float GetCurrentLookDirection()
-    {
-        return targetArrowTransform.eulerAngles.x;
-    }
-
     internal bool Aiming()
     {
-        return chargeClick & !onCD &! cancelled;
+        return chargeClick & !onCD;
     }
 
     internal bool Shooting()
@@ -256,6 +193,31 @@ public class TentacleShooter : NetworkBehaviour
     }
 
     #region RPCs
+    [Rpc(sources: RpcSources.All, targets: RpcTargets.All)]
+    void RPC_ShowShotStart()
+    {
+        chargingShot = true;
+        LeanTween.color(controller.visualsRend.gameObject, Color.red, .5f).setLoopPingPong().setEaseInOutSine();
+        //if (Runner.IsServer)
+        //{
+        //    Runner.Despawn(fishObject);
+        //    FindObjectOfType<FishSpawner>().currentPopulationCount--;
+        //}
+    }
+
+    [Rpc(sources: RpcSources.All, targets: RpcTargets.All)]
+    void RPC_StopShotStart()
+    {
+        chargingShot = false;
+        LeanTween.cancel(controller.visualsRend.gameObject);
+        LeanTween.color(controller.visualsRend.gameObject, Color.white, .5f).setEaseInOutSine();
+        //if (Runner.IsServer)
+        //{
+        //    Runner.Despawn(fishObject);
+        //    FindObjectOfType<FishSpawner>().currentPopulationCount--;
+        //}
+    }
+
 
     [Rpc(sources: RpcSources.All, targets: RpcTargets.All)]
     void RPC_DestroyFish(NetworkObject fishObject)
@@ -268,82 +230,4 @@ public class TentacleShooter : NetworkBehaviour
     }
     #endregion
 
-    #region Targetting
-    [ContextMenu("Show Arrow")]
-    void ShowTargetArrow()
-    {
-        cancelled = false;
-        showingArrow = true;
-
-        targettingArrowRend.size = new Vector2(0, 1);
-        targettingArrowRendBG.size = new Vector2(shootDistance, 1);
-        targettingArrowRendBG.enabled = true;
-
-        if (currentShotCD <= 0.0f)
-        {
-            ShowTargettingArrow();
-        }
-        else
-        {
-            GameManager.singleton.abilityButtons[0].PlayEffect_CD();
-        }
-    }
-
-    void ShowTargettingArrow()
-    {
-        GameManager.singleton.abilityButtons[0].PlayEffect_Press();
-        targettingArrowRend.enabled = true;
-        LeanTween.value(gameObject, UpdateArrow, 0.0f, targettingArrowRendBG.size.x, .5f);
-        LeanTween.color(controller.visualsRend.gameObject, Color.red, .25f).setLoopPingPong();
-    }
-
-    void UpdateArrow(float f)
-    {
-        shotPercInternal = f / targettingArrowRendBG.size.x;
-        aimPositionTransform.localPosition = new Vector3(f / 2, -.33f, 0);
-        targettingArrowRend.size = new Vector2(f, 1);
-    }
-
-    [ContextMenu("Hide Arrow")]
-    void HideTargetArrow()
-    {
-        //aimPositionTransform.localPosition = new Vector3(0, -.33f, 0);
-        showingArrow = false;
-        targettingArrowRend.enabled = false;
-        targettingArrowRendBG.enabled = false;
-        LeanTween.cancel(controller.visualsRend.gameObject);
-        LeanTween.color(controller.visualsRend.gameObject, startColor, .25f);
-    }
-
-    void CancelAim()
-    {
-        cancelled = true;
-        HideTargetArrow();
-    }
-
-    void CheckTargettingArrow()
-    {
-        if (showingArrow)
-        {
-            Vector3 mousePos = Input.mousePosition;
-            Vector3 worldPosition = Camera.main.ScreenToWorldPoint(mousePos);
-            worldPosition.z = 0;
-
-            targetArrowTransform.transform.right = worldPosition - transform.position;
-
-            if(!onCD)
-                playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, /*-targetArrowTransform.transform.right*/(Vector2)playerVisuals.transform.position - currentHitPoint, Time.deltaTime * 5);
-            else
-                playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, controller.moveDirection == Vector2.zero ? Vector2.up : controller.moveDirection, Time.deltaTime * 5);
-        }
-        else if (shooting)
-        {
-            playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, (Vector2)playerVisuals.transform.position - currentHitPoint, Time.deltaTime * 5);
-        }
-        else
-        {
-            playerVisuals.transform.up = Vector3.Lerp(playerVisuals.transform.up, controller.moveDirection == Vector2.zero ? Vector2.up : controller.moveDirection, Time.deltaTime * 10);
-        }
-    }
-    #endregion
 }
